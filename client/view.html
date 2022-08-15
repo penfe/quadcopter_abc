@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>
+        Drone Simulator
+    </title>
+</head>
+
+<body>
+    <div id="webgl-output"></div>
+</body>
+
+<script type="module">
+     
+    import * as THREE from 'https://cdn.skypack.dev/three@0.128.0'
+    import { OrbitControls } from 'https://cdn.skypack.dev/three@0.128.0/examples/jsm/controls/OrbitControls.js'
+
+    class View3D {
+
+        #scene = null
+        #renderer = null
+        #camera = null
+        #drone = null
+
+        get dom() {
+            return this.#renderer.domElement
+        }
+
+        get camera() {
+            return this.#camera
+        }
+
+        constructor(canvas, devicePixelRatio, innerWidth, innerHeight) {
+            this.#scene = new THREE.Scene()
+
+            this.#scene.add(new THREE.AxesHelper(5))
+            const ground = new THREE.GridHelper(10, 100)
+            ground.rotation.x = Math.PI / 2
+            this.#scene.add(ground)
+
+            var ambienLight = new THREE.AmbientLight(0x353535)
+            this.#scene.add(ambienLight)
+
+            this.#camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 1000)
+            this.#camera.position.set(-1, 0.5, -0.3)
+            this.#camera.lookAt(0, 0, 0)
+            this.#camera.up = new THREE.Vector3( 0, 0, -1)
+
+            this.#renderer = new THREE.WebGLRenderer({ antialias: true })
+            this.#renderer.setPixelRatio(devicePixelRatio)
+            this.#renderer.setSize(innerWidth, innerHeight)
+
+            canvas.appendChild(this.#renderer.domElement)
+        }
+
+        render() {
+            this.#renderer.render(this.#scene, this.#camera)
+        }
+
+        init_model() {
+            if (null == this.#drone) {
+                const mat = new THREE.MeshBasicMaterial({ color: 'DeepSkyBlue' })
+                const arm_l = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.01, 0.005), mat)
+                arm_l.rotation.z = -Math.PI / 4
+                const arm_r = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.01, 0.005), mat)
+                arm_r.rotation.z = Math.PI / 4
+                const geometry = new THREE.BoxGeometry(0.1, 0.02, 0.005 + 0.001)
+                this.#drone = new THREE.Mesh(geometry, mat)
+                this.#drone.add(arm_l)
+                this.#drone.add(arm_r)
+                this.#scene.add(this.#drone)
+                // const m = new THREE.Matrix4()
+                // m.fromArray([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1])
+                // this.#drone.setRotationFromMatrix(m)
+            } else {
+                console.log(this.#drone)
+            }
+        }
+
+        update_model(rm) {
+            if (null != this.#drone) {
+                this.#drone.position.set(rm[12], rm[13], rm[14])
+                const m = new THREE.Matrix4()
+                m.fromArray(rm)
+                this.#drone.setRotationFromMatrix(m) // pf: Matrix3?
+                // this.#drone.matrixWorld.fromArray(rm) // pf: why it doesn't work?...
+                // this.#drone.matrixWorldNeedsUpdate = true
+                // this.#drone.updateMatrixWorld(true)
+            }
+        }
+    }
+
+    let m_viewer = new View3D(document.getElementById('webgl-output'), window.devicePixelRatio, window.innerWidth, window.innerHeight)
+    m_viewer.init_model()
+
+    let m_orbit = new OrbitControls(m_viewer.camera, m_viewer.dom)
+    m_orbit.listenToKeyEvents(window) // optional
+    //orbit.addEventListener( 'change', render ); // call this only in static scenes (i.e., if there is no animation loop)
+    m_orbit.enableDamping = true // an animation loop is required when either damping or auto-rotation are enabled
+    // orbit.screenSpacePanning = false;
+    m_orbit.minDistance = 0.1
+    m_orbit.maxDistance = 10
+    // orbit.maxPolarAngle = Math.PI / 2;
+
+    animate()
+    // viewer.render()
+
+    function animate() {
+        requestAnimationFrame(animate)
+        m_orbit.update() // only required if controls.enableDamping = true, or if controls.autoRotate = true
+        m_viewer.render()
+    }
+
+    function onkeydown(e) {
+        var e = e || window.event
+        switch(e.code) {
+            case 'Enter':
+                m_viewer.init_model()
+                break
+            case 'Space':
+                request_rm(m_ws)
+                // const m = new THREE.Matrix4()
+                // m.set(
+                //     0, -1, 0, 0,
+                //     0, 0, -1, 0,
+                //     1, 0, 0, 0,
+                //     0, 0, 0, 1)
+                // m_viewer.update_model(m.elements)
+                break
+            case 'KeyA':
+                request_op(m_ws, 'L')
+                break
+            case 'KeyD':
+                request_op(m_ws, 'R')
+                break
+            case 'KeyW':
+                request_op(m_ws, 'T')
+                break
+            case 'KeyS':
+                request_op(m_ws, 'B')
+                break
+            default:
+                console.log(e)
+                break
+
+        }
+        // e.cancelBubble = true
+        // e.stopPropagation()
+        // e.preventDefault()
+        return false
+    }
+    document.onkeydown = onkeydown
+
+    function init_ws() {
+        var ws = new WebSocket('ws://localhost:5678/')
+
+        ws.onopen = function (event) {
+            console.log("ws.onopen...")
+            // console.log(ws.readyState)
+            var timer = setInterval(function() {
+                request_rm(m_ws)
+            }, 50)
+            // TODO: 无需客户端发送请求，由服务器端单向自动定时更新？
+        }
+
+        ws.onclose = function (event) {
+            console.log("ws.onclose...")
+            // console.log(event.code)
+            // console.log(event.reason)
+        }
+
+        ws.onmessage = function (event) {
+            // console.log(event.data)
+            var info = JSON.parse(event.data)
+            if ('RotationMatrix_SC' == info['cmd']) {
+                m_viewer.update_model(info['m'])
+            }
+            // console.log(Date.now())
+        }
+
+        ws.onerror = function (event) {
+            console.log(event)
+        }
+
+        return ws
+    }
+
+    function request_rm(ws) {        
+        if (WebSocket.OPEN == ws.readyState) {
+            var data = {
+                cmd: 'RotationMatrix_CS'
+            }
+            ws.send(JSON.stringify(data))
+        }
+    }
+
+    function request_op(ws, op_code) {        
+        if (WebSocket.OPEN == ws.readyState) {
+            var data = {
+                cmd: 'Operation_CS',
+                op: op_code
+            }
+            ws.send(JSON.stringify(data))
+        }        
+    }
+
+    var m_ws = init_ws()    
+
+</script>
+
+</html>
