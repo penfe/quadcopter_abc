@@ -25,12 +25,14 @@ $ \phi \ \theta \ \psi $ 分别表示绕 $ X $ 轴旋转的**翻滚角 Roll**、
 
 <img src="https://pic1.zhimg.com/80/v2-f3101ad00adbc902f12d9ffcedae4e24_720w.jpg" width="30%" />
 
-任一机体坐标系下的向量 $ p^b $ 左乘旋转矩阵 $ R_b^e $ 即可得到地球坐标系下对应的向量 $ p^e $
+任一机体坐标系下的向量 $p^b$ 左乘旋转矩阵 $ R_b^e $ 即可得到地球坐标系下对应的向量 $$ p^e $$
 
-$ p^e = R_b^e p^b= 
+$$
+p^e = R_b^e p^b= 
 \begin{bmatrix} 
 cos(\theta)cos(\psi) & cos(\psi)sin(\theta)sin(\phi)-sin(\psi)cos(\phi) & cos(\psi)sin(\theta)cos(\phi)+sin(\psi)sin(\phi) \\ 
 cos(\theta)sin(\psi) & sin(\psi)sin(\theta)sin(\phi)+cos(\psi)cos(\phi) & sin(\psi)sin(\theta)cos(\phi)-cos(\psi)sin(\phi) 
 \\ -sin(\theta) & sin(\phi)cos(\theta) & cos(\phi)cos(\theta)
-\end{bmatrix} p^b $
+\end{bmatrix} p^b
+$$
 
